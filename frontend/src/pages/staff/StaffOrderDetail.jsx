@@ -4,6 +4,7 @@ import { toast } from 'react-toastify'
 import { ArrowLeft, CreditCard } from 'lucide-react'
 import orderService from '../../services/orderService'
 import paymentService from '../../services/paymentService'
+import tableService from '../../services/tableService'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { OrderStatusBadge } from '../../components/common/StatusBadge'
 import { formatCurrency, formatDateTime } from '../../utils/formatters'
@@ -18,6 +19,9 @@ export default function StaffOrderDetail() {
   const [payment,  setPayment]  = useState(null)
   const [loading,  setLoading]  = useState(true)
   const [payModal, setPayModal] = useState(false)
+  const [transferModal, setTransferModal] = useState(false)
+  const [transferTableId, setTransferTableId] = useState('')
+  const [tables, setTables] = useState([])
   const [method,   setMethod]   = useState('CASH')
   const [submitting, setSubmitting] = useState(false)
 
@@ -35,6 +39,17 @@ export default function StaffOrderDetail() {
   }
 
   useEffect(() => { load() }, [id])
+
+  useEffect(() => {
+    if (!transferModal) return
+
+    tableService.getAll().then(r => {
+      const all = r.data.data || []
+      const selectable = all.filter(t => t.id !== order?.tableId)
+      setTables(selectable)
+      setTransferTableId(selectable[0]?.id ? String(selectable[0].id) : '')
+    })
+  }, [transferModal, order?.tableId])
 
   const handleAdvanceStatus = async () => {
     const next = NEXT[order.status]
@@ -78,6 +93,22 @@ export default function StaffOrderDetail() {
       load()
     } catch(err) { toast.error(err.response?.data?.message || 'Lỗi') }
     finally { setSubmitting(false) }
+  }
+
+  const handleTransferTable = async () => {
+    if (!transferTableId) {
+      toast.error('Vui lòng chọn bàn mới')
+      return
+    }
+
+    try {
+      await orderService.transferTable(id, Number(transferTableId))
+      toast.success('Chuyển bàn thành công')
+      setTransferModal(false)
+      load()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không thể chuyển bàn')
+    }
   }
 
   if (loading) return <LoadingSpinner />
@@ -171,9 +202,28 @@ export default function StaffOrderDetail() {
 
         {/* Cancel (chỉ PENDING / CONFIRMED) */}
         {['PENDING','CONFIRMED'].includes(order.status) && (
-          <button onClick={handleCancel} className="btn-danger">Hủy đơn</button>
+          <>
+            <button onClick={() => setTransferModal(true)} className="btn-outline">Chuyển bàn</button>
+            <button onClick={handleCancel} className="btn-danger">Hủy đơn</button>
+          </>
         )}
       </div>
+
+      {transferModal && (
+        <div className="card border-2 border-primary-200 bg-primary-50">
+          <h3 className="font-semibold text-gray-900 mb-3">Chuyển đơn sang bàn khác</h3>
+          <label className="form-label">Chọn bàn mới</label>
+          <select value={transferTableId} onChange={e => setTransferTableId(e.target.value)} className="form-input mb-4">
+            {tables.length === 0 ? <option value="">Không có bàn khả dụng</option> : tables.map(t => (
+              <option key={t.id} value={t.id}>Bàn {t.tableNumber} ({t.status})</option>
+            ))}
+          </select>
+          <div className="flex gap-3">
+            <button onClick={() => setTransferModal(false)} className="btn-outline flex-1">Hủy</button>
+            <button onClick={handleTransferTable} className="btn-primary flex-1">Xác nhận</button>
+          </div>
+        </div>
+      )}
 
       {/* Payment method modal (inline) */}
       {payModal && (

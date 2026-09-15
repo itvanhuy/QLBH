@@ -1,6 +1,7 @@
 package com.restaurant.controller;
 
 import com.restaurant.dto.request.OrderRequest;
+import com.restaurant.dto.request.TransferTableRequest;
 import com.restaurant.dto.response.ApiResponse;
 import com.restaurant.dto.response.OrderResponse;
 import com.restaurant.dto.response.PageResponse;
@@ -66,6 +67,13 @@ public class OrderController {
                 orderService.getOrderById(id)));
     }
 
+        @GetMapping("/table/{tableId}/active")
+        @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+        public ResponseEntity<ApiResponse<OrderResponse>> getActiveOrderByTable(@PathVariable Long tableId) {
+                return ResponseEntity.ok(ApiResponse.success("Lấy đơn hàng đang hoạt động của bàn thành công",
+                                orderService.getActiveOrderByTableId(tableId)));
+        }
+
     // ── Tạo order mới ──────────────────────────────────────
     @PostMapping
     @PreAuthorize("isAuthenticated()")
@@ -98,6 +106,16 @@ public class OrderController {
 
         return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái thành công",
                 orderService.updateOrderStatus(id, body.get("status"))));
+    }
+
+    @PatchMapping("/{id}/transfer")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    public ResponseEntity<ApiResponse<OrderResponse>> transferOrderToTable(
+            @PathVariable Long id,
+            @Valid @RequestBody TransferTableRequest request) {
+
+        return ResponseEntity.ok(ApiResponse.success("Chuyển bàn thành công",
+                orderService.transferOrderToTable(id, request.getTableId())));
     }
 
     // ── Xóa order ──────────────────────────────────────────

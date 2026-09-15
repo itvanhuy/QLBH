@@ -70,6 +70,18 @@ public class OrderServiceImpl implements OrderService {
         return OrderResponse.fromEntity(findById(id));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public OrderResponse getActiveOrderByTableId(Long tableId) {
+        RestaurantTable table = tableRepository.findById(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException(AppConstants.TABLE_NOT_FOUND));
+
+        Order activeOrder = orderRepository.findActiveOrderByTableId(table.getId())
+                .orElseThrow(() -> new BadRequestException("Bàn " + table.getTableNumber() + " hiện không có đơn hàng đang hoạt động"));
+
+        return OrderResponse.fromEntity(activeOrder);
+    }
+
     // ====================================================
     // GET MY ORDERS (Customer)
     // ====================================================
@@ -204,6 +216,47 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return OrderResponse.fromEntity(orderRepository.save(order));
+    }
+
+    @Override
+    public OrderResponse transferOrderToTable(Long orderId, Long targetTableId) {
+        Order order = findById(orderId);
+
+        if (order.getStatus() == Order.Status.COMPLETED || order.getStatus() == Order.Status.CANCELLED) {
+            throw new BadRequestException("Không thể chuyển bàn cho đơn hàng đã hoàn tất hoặc đã hủy");
+        }
+
+        RestaurantTable sourceTable = order.getTable();
+        RestaurantTable targetTable = tableRepository.findById(targetTableId)
+                .orElseThrow(() -> new ResourceNotFoundException(AppConstants.TABLE_NOT_FOUND));
+
+        if (sourceTable.getId().equals(targetTable.getId())) {
+            return OrderResponse.fromEntity(order);
+        }
+
+        orderRepository.findActiveOrderByTableId(targetTable.getId())
+                .ifPresent(existing -> {
+                    if (!existing.getId().equals(order.getId())) {
+                        throw new BadRequestException("Bàn " + targetTable.getTableNumber() + " đang có đơn hàng khác chưa hoàn tất");
+                    }
+                });
+
+        order.setTable(targetTable);
+
+        boolean sourceHasAnotherActiveOrder = orderRepository.findActiveOrderByTableId(sourceTable.getId())
+                .map(existing -> !existing.getId().equals(order.getId()))
+                .orElse(false);
+
+        sourceTable.setStatus(sourceHasAnotherActiveOrder ? RestaurantTable.Status.OCCUPIED : RestaurantTable.Status.AVAILABLE);
+        targetTable.setStatus(RestaurantTable.Status.OCCUPIED);
+
+        tableRepository.save(sourceTable);
+        tableRepository.save(targetTable);
+        Order saved = orderRepository.save(order);
+
+        log.info("Chuyển order id={} từ bàn {} sang bàn {}", saved.getId(), sourceTable.getTableNumber(), targetTable.getTableNumber());
+
+        return OrderResponse.fromEntity(saved);
     }
 
     // ====================================================

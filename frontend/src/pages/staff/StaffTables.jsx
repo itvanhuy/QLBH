@@ -3,9 +3,11 @@ import { toast } from 'react-toastify'
 import { useNavigate } from 'react-router-dom'
 import { Users, Plus } from 'lucide-react'
 import tableService from '../../services/tableService'
+import orderService from '../../services/orderService'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import Modal from '../../components/common/Modal'
 import { TableStatusBadge } from '../../components/common/StatusBadge'
+import { formatCurrency } from '../../utils/formatters'
 
 const STATUS_OPTS = ['AVAILABLE','OCCUPIED','RESERVED']
 
@@ -13,6 +15,8 @@ export default function StaffTables() {
   const [tables,  setTables]  = useState([])
   const [loading, setLoading] = useState(true)
   const [modal,   setModal]   = useState(null) // table obj to change status
+  const [activeOrder, setActiveOrder] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
   const navigate = useNavigate()
 
   const load = () => {
@@ -20,6 +24,23 @@ export default function StaffTables() {
     tableService.getAll().then(r => setTables(r.data.data)).finally(() => setLoading(false))
   }
   useEffect(() => { load() }, [])
+
+  const openTableDetail = async (table) => {
+    setModal(table)
+    setActiveOrder(null)
+
+    if (table.status !== 'OCCUPIED') return
+
+    try {
+      setDetailLoading(true)
+      const res = await orderService.getActiveByTableId(table.id)
+      setActiveOrder(res.data.data)
+    } catch {
+      setActiveOrder(null)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
 
   const handleChangeStatus = async (id, status) => {
     try {
@@ -59,7 +80,7 @@ export default function StaffTables() {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {tables.map(t => (
           <div key={t.id}
-            onClick={() => setModal(t)}
+            onClick={() => openTableDetail(t)}
             className={`card-sm cursor-pointer hover:shadow-md transition-all border-2 select-none
               ${t.status==='AVAILABLE' ? 'border-green-200 hover:border-green-400' :
                 t.status==='OCCUPIED'  ? 'border-red-200 hover:border-red-400' :
@@ -85,6 +106,28 @@ export default function StaffTables() {
             <p className="text-sm text-gray-600 mb-4">
               Trạng thái hiện tại: <TableStatusBadge status={modal.status} />
             </p>
+
+            {detailLoading ? (
+              <p className="text-sm text-gray-500">Đang tải đơn hàng...</p>
+            ) : activeOrder ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-gray-800">Đơn hàng #{activeOrder.id}</span>
+                  <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600">{activeOrder.status}</span>
+                </div>
+                <p className="text-gray-600">Khách: {activeOrder.customerName || '—'}</p>
+                <p className="text-gray-600">Món: {activeOrder.items?.length || 0} món</p>
+                <p className="text-gray-600">Tổng: {formatCurrency(activeOrder.totalAmount)}</p>
+                <button onClick={() => navigate(`/staff/orders/${activeOrder.id}`)} className="btn-primary w-full mt-2">
+                  Xem chi tiết đơn
+                </button>
+              </div>
+            ) : (
+              modal.status === 'OCCUPIED' && (
+                <p className="text-sm text-gray-500">Bàn đang có khách nhưng không tìm thấy đơn hàng đang hoạt động.</p>
+              )
+            )}
+
             <p className="text-sm font-medium text-gray-700">Chuyển sang:</p>
             {STATUS_OPTS.filter(s => s !== modal.status).map(s => (
               <button key={s} onClick={() => handleChangeStatus(modal.id, s)}
