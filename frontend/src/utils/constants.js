@@ -27,3 +27,12 @@ export const PRODUCT_STATUS = {
   AVAILABLE:   { label: 'Còn phục vụ', color: 'badge-green' },
   UNAVAILABLE: { label: 'Tạm hết',     color: 'badge-red'   },
 }
+
+export const RESERVATION_STATUS = {
+  PENDING:    { label: 'Chờ xác nhận',  color: 'badge-yellow' },
+  CONFIRMED:  { label: 'Đã xác nhận',   color: 'badge-green'  },
+  CHECKED_IN: { label: 'Đang dùng bữa', color: 'badge-blue'   },
+  COMPLETED:  { label: 'Hoàn thành',    color: 'badge-gray'   },
+  CANCELLED:  { label: 'Đã hủy',        color: 'badge-red'    },
+  NO_SHOW:    { label: 'Không đến',     color: 'badge-orange' },
+}

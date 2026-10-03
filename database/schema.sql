@@ -184,3 +184,34 @@ CREATE TABLE IF NOT EXISTS payments (
     INDEX idx_payments_status (status),
     INDEX idx_payments_paid_at (paid_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Thanh toán';
+
+-- ============================================================
+-- BẢNG RESERVATIONS
+-- Đặt bàn trước (PENDING → CONFIRMED → COMPLETED / CANCELLED)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS reservations (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    customer_id     BIGINT NOT NULL                         COMMENT 'FK → users (customer)',
+    table_id        BIGINT                                  COMMENT 'FK → restaurant_tables (bán được gán khi xác nhận)',
+    guest_count     INT NOT NULL                            COMMENT 'Số khách',
+    reservation_date DATE NOT NULL                          COMMENT 'Ngày đặt',
+    reservation_time TIME NOT NULL                          COMMENT 'Giờ đặt',
+    note            TEXT                                    COMMENT 'Yêu cầu đặc biệt',
+    status          ENUM('PENDING','CONFIRMED','CHECKED_IN','CANCELLED','NO_SHOW','COMPLETED') NOT NULL DEFAULT 'PENDING',
+    order_id        BIGINT                                  COMMENT 'FK → orders (đơn phát sinh khi đón khách)',
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_res_customer FOREIGN KEY (customer_id)
+        REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_res_table    FOREIGN KEY (table_id)
+        REFERENCES restaurant_tables(id) ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT fk_res_order    FOREIGN KEY (order_id)
+        REFERENCES orders(id) ON DELETE SET NULL ON UPDATE CASCADE,
+
+    INDEX idx_res_customer (customer_id),
+    INDEX idx_res_table (table_id),
+    INDEX idx_res_order (order_id),
+    INDEX idx_res_date (reservation_date),
+    INDEX idx_res_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Đặt bàn trước';

@@ -19,28 +19,32 @@ import LoginPage      from '../pages/public/LoginPage'
 import RegisterPage   from '../pages/public/RegisterPage'
 
 // ── Admin pages ───────────────────────────────────────
-import AdminDashboard  from '../pages/admin/AdminDashboard'
-import AdminUsers      from '../pages/admin/AdminUsers'
-import AdminCategories from '../pages/admin/AdminCategories'
-import AdminProducts   from '../pages/admin/AdminProducts'
-import AdminTables     from '../pages/admin/AdminTables'
-import AdminOrders     from '../pages/admin/AdminOrders'
-import AdminVouchers   from '../pages/admin/AdminVouchers'
-import AdminReports    from '../pages/admin/AdminReports'
+import AdminDashboard    from '../pages/admin/AdminDashboard'
+import AdminUsers        from '../pages/admin/AdminUsers'
+import AdminCategories   from '../pages/admin/AdminCategories'
+import AdminProducts     from '../pages/admin/AdminProducts'
+import AdminTables       from '../pages/admin/AdminTables'
+import AdminOrders       from '../pages/admin/AdminOrders'
+import AdminVouchers     from '../pages/admin/AdminVouchers'
+import AdminReservations from '../pages/admin/AdminReservations'
+import AdminReports      from '../pages/admin/AdminReports'
 
 // ── Staff pages ───────────────────────────────────────
-import StaffDashboard   from '../pages/staff/StaffDashboard'
-import StaffTables      from '../pages/staff/StaffTables'
-import StaffOrders      from '../pages/staff/StaffOrders'
-import StaffOrderCreate from '../pages/staff/StaffOrderCreate'
-import StaffOrderDetail from '../pages/staff/StaffOrderDetail'
-import StaffPayments    from '../pages/staff/StaffPayments'
+import StaffDashboard     from '../pages/staff/StaffDashboard'
+import StaffTables        from '../pages/staff/StaffTables'
+import StaffOrders        from '../pages/staff/StaffOrders'
+import StaffOrderCreate   from '../pages/staff/StaffOrderCreate'
+import StaffOrderDetail   from '../pages/staff/StaffOrderDetail'
+import StaffPayments      from '../pages/staff/StaffPayments'
+import StaffReservations  from '../pages/staff/StaffReservations'
 
 // ── Customer pages ────────────────────────────────────
-import CustomerDashboard   from '../pages/customer/CustomerDashboard'
-import CustomerOrders      from '../pages/customer/CustomerOrders'
-import CustomerOrderDetail from '../pages/customer/CustomerOrderDetail'
-import CustomerProfile     from '../pages/customer/CustomerProfile'
+import CustomerDashboard    from '../pages/customer/CustomerDashboard'
+import CustomerOrders       from '../pages/customer/CustomerOrders'
+import CustomerOrderCreate  from '../pages/customer/CustomerOrderCreate'
+import CustomerOrderDetail  from '../pages/customer/CustomerOrderDetail'
+import CustomerReservations from '../pages/customer/CustomerReservations'
+import CustomerProfile      from '../pages/customer/CustomerProfile'
 
 export default function AppRoutes() {
   const { user, isAuthenticated } = useAuth()
@@ -49,18 +53,14 @@ export default function AppRoutes() {
     <Routes>
       {/* ── PUBLIC ──────────────────────────────────── */}
       <Route element={<PublicLayout />}>
-        <Route path="/"          element={<HomePage />} />
-        <Route path="/menu"      element={<MenuPage />} />
-        <Route path="/menu/:id"  element={<MenuDetailPage />} />
-        <Route path="/login"     element={
-          isAuthenticated
-            ? <Navigate to={getHomeByRole(user?.role)} replace />
-            : <LoginPage />
+        <Route path="/"         element={<HomePage />} />
+        <Route path="/menu"     element={<MenuPage />} />
+        <Route path="/menu/:id" element={<MenuDetailPage />} />
+        <Route path="/login" element={
+          isAuthenticated ? <Navigate to={getHomeByRole(user?.role)} replace /> : <LoginPage />
         } />
-        <Route path="/register"  element={
-          isAuthenticated
-            ? <Navigate to={getHomeByRole(user?.role)} replace />
-            : <RegisterPage />
+        <Route path="/register" element={
+          isAuthenticated ? <Navigate to={getHomeByRole(user?.role)} replace /> : <RegisterPage />
         } />
       </Route>
 
@@ -71,14 +71,15 @@ export default function AppRoutes() {
         </RoleRoute>
       }>
         <Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard"  element={<AdminDashboard />} />
-        <Route path="users"      element={<AdminUsers />} />
-        <Route path="categories" element={<AdminCategories />} />
-        <Route path="products"   element={<AdminProducts />} />
-        <Route path="tables"     element={<AdminTables />} />
-        <Route path="orders"     element={<AdminOrders />} />
-        <Route path="vouchers"   element={<AdminVouchers />} />
-        <Route path="reports"    element={<AdminReports />} />
+        <Route path="dashboard"    element={<AdminDashboard />} />
+        <Route path="users"        element={<AdminUsers />} />
+        <Route path="categories"   element={<AdminCategories />} />
+        <Route path="products"     element={<AdminProducts />} />
+        <Route path="tables"       element={<AdminTables />} />
+        <Route path="orders"       element={<AdminOrders />} />
+        <Route path="vouchers"     element={<AdminVouchers />} />
+        <Route path="reservations" element={<AdminReservations />} />
+        <Route path="reports"      element={<AdminReports />} />
       </Route>
 
       {/* ── STAFF ───────────────────────────────────── */}
@@ -94,6 +95,7 @@ export default function AppRoutes() {
         <Route path="orders/create" element={<StaffOrderCreate />} />
         <Route path="orders/:id"    element={<StaffOrderDetail />} />
         <Route path="payments"      element={<StaffPayments />} />
+        <Route path="reservations"  element={<StaffReservations />} />
       </Route>
 
       {/* ── CUSTOMER ────────────────────────────────── */}
@@ -103,10 +105,12 @@ export default function AppRoutes() {
         </PrivateRoute>
       }>
         <Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard"   element={<CustomerDashboard />} />
-        <Route path="orders"      element={<CustomerOrders />} />
-        <Route path="orders/:id"  element={<CustomerOrderDetail />} />
-        <Route path="profile"     element={<CustomerProfile />} />
+        <Route path="dashboard"    element={<CustomerDashboard />} />
+        <Route path="order"        element={<CustomerOrderCreate />} />
+        <Route path="orders"       element={<CustomerOrders />} />
+        <Route path="orders/:id"   element={<CustomerOrderDetail />} />
+        <Route path="reservations" element={<CustomerReservations />} />
+        <Route path="profile"      element={<CustomerProfile />} />
       </Route>
 
       {/* ── 404 ─────────────────────────────────────── */}

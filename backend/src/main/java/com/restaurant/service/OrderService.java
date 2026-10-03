@@ -12,6 +12,7 @@ public interface OrderService {
     PageResponse<OrderResponse> getMyOrders(String email, int page, int size);
     OrderResponse createOrder(OrderRequest request, String currentUserEmail);
     OrderResponse updateOrder(Long id, OrderRequest request);
+    OrderResponse addItemsToOrder(Long id, java.util.List<com.restaurant.dto.request.OrderItemRequest> items);
     OrderResponse updateOrderStatus(Long id, String status);
     OrderResponse transferOrderToTable(Long orderId, Long targetTableId);
     void deleteOrder(Long id);

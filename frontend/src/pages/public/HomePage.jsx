@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { UtensilsCrossed, Star, Clock, MapPin, ArrowRight, ChefHat, Users, Award } from 'lucide-react'
+import { useAuth } from '../../hooks/useAuth'
 
 const features = [
   { icon: ChefHat,  title: 'Đầu bếp chuyên nghiệp', desc: 'Đội ngũ đầu bếp giàu kinh nghiệm, mang đến những món ăn ngon nhất' },
@@ -16,6 +17,8 @@ const highlights = [
 ]
 
 export default function HomePage() {
+  const { isAuthenticated } = useAuth()
+
   return (
     <div>
       {/* ── Hero ─────────────────────────────────────────── */}
@@ -37,7 +40,10 @@ export default function HomePage() {
               <Link to="/menu" className="btn bg-white text-primary-600 hover:bg-gray-50 btn-lg font-semibold">
                 Xem thực đơn <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link to="/register" className="btn border-2 border-white text-white hover:bg-white/10 btn-lg font-semibold">
+              <Link
+                to={isAuthenticated ? '/customer/reservations' : '/login'}
+                className="btn border-2 border-white text-white hover:bg-white/10 btn-lg font-semibold"
+              >
                 Đặt bàn ngay
               </Link>
             </div>

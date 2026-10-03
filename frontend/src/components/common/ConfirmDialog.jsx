@@ -9,8 +9,8 @@ export default function ConfirmDialog({ isOpen, onClose, onConfirm, title, messa
         <p className="text-sm text-gray-600">{message}</p>
       </div>
       <div className="flex justify-end gap-3">
-        <button onClick={onClose} className="btn-outline">Hủy</button>
-        <button onClick={() => { onConfirm(); onClose() }} className={danger ? 'btn-danger' : 'btn-primary'}>
+        <button type="button" onClick={onClose} className="btn-outline">Hủy</button>
+        <button type="button" onClick={() => { onConfirm(); onClose() }} className={danger ? 'btn-danger' : 'btn-primary'}>
           {confirmText}
         </button>
       </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { ClipboardList, UtensilsCrossed, ArrowRight, Clock } from 'lucide-react'
+import { ClipboardList, UtensilsCrossed, ArrowRight, Clock, CalendarDays } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import orderService from '../../services/orderService'
 import { OrderStatusBadge } from '../../components/common/StatusBadge'
@@ -9,13 +9,18 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 
 export default function CustomerDashboard() {
   const { user } = useAuth()
-  const [orders,  setOrders]  = useState([])
-  const [loading, setLoading] = useState(true)
+  const [recentOrders, setRecentOrders] = useState([])
+  const [allOrders,    setAllOrders]    = useState([])
+  const [loading,      setLoading]      = useState(true)
 
   useEffect(() => {
-    orderService.getMyOrders({ page: 0, size: 5 })
-      .then(r => setOrders(r.data.data.content))
-      .finally(() => setLoading(false))
+    Promise.all([
+      orderService.getMyOrders({ page: 0, size: 5 }),
+      orderService.getMyOrders({ page: 0, size: 1000 }),
+    ]).then(([recent, all]) => {
+      setRecentOrders(recent.data.data.content)
+      setAllOrders(all.data.data.content)
+    }).finally(() => setLoading(false))
   }, [])
 
   return (
@@ -24,9 +29,12 @@ export default function CustomerDashboard() {
       <div className="card bg-gradient-to-r from-primary-500 to-primary-600 text-white border-0">
         <h1 className="text-xl font-bold mb-1">Xin chào, {user?.name}! 👋</h1>
         <p className="text-white/80 text-sm">Chào mừng bạn quay lại nhà hàng của chúng tôi</p>
-        <div className="flex gap-3 mt-4">
+        <div className="flex gap-3 mt-4 flex-wrap">
           <Link to="/menu" className="btn bg-white text-primary-600 hover:bg-gray-50 btn-sm font-semibold">
             <UtensilsCrossed className="h-4 w-4" /> Xem thực đơn
+          </Link>
+          <Link to="/customer/reservations" className="btn bg-yellow-300 text-yellow-900 hover:bg-yellow-400 btn-sm font-semibold">
+            <CalendarDays className="h-4 w-4" /> Đặt bàn trước
           </Link>
           <Link to="/customer/orders" className="btn border border-white/50 text-white hover:bg-white/10 btn-sm">
             <ClipboardList className="h-4 w-4" /> Đơn hàng của tôi
@@ -37,9 +45,9 @@ export default function CustomerDashboard() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Tổng đơn',    val: orders.length,                                      color: 'text-blue-600 bg-blue-50'   },
-          { label: 'Đang xử lý', val: orders.filter(o => ['PENDING','CONFIRMED'].includes(o.status)).length, color: 'text-yellow-600 bg-yellow-50' },
-          { label: 'Hoàn thành', val: orders.filter(o => o.status === 'COMPLETED').length,  color: 'text-green-600 bg-green-50'  },
+          { label: 'Tổng đơn',    val: allOrders.length,                                      color: 'text-blue-600 bg-blue-50'   },
+          { label: 'Đang xử lý', val: allOrders.filter(o => ['PENDING','CONFIRMED'].includes(o.status)).length, color: 'text-yellow-600 bg-yellow-50' },
+          { label: 'Hoàn thành', val: allOrders.filter(o => o.status === 'COMPLETED').length,  color: 'text-green-600 bg-green-50'  },
         ].map(s => (
           <div key={s.label} className="card-sm text-center">
             <p className={`text-2xl font-bold ${s.color.split(' ')[0]} mb-1`}>{s.val}</p>
@@ -57,7 +65,7 @@ export default function CustomerDashboard() {
           </Link>
         </div>
 
-        {loading ? <LoadingSpinner size="sm" /> : orders.length === 0
+        {loading ? <LoadingSpinner size="sm" /> : recentOrders.length === 0
           ? (
             <div className="text-center py-8">
               <ClipboardList className="h-10 w-10 text-gray-300 mx-auto mb-2" />
@@ -67,7 +75,7 @@ export default function CustomerDashboard() {
           )
           : (
             <div className="space-y-3">
-              {orders.map(o => (
+              {recentOrders.map(o => (
                 <Link key={o.id} to={`/customer/orders/${o.id}`}
                   className="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-primary-50 transition-colors">
                   <div className="flex items-center gap-3">

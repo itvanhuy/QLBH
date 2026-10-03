@@ -16,8 +16,10 @@ Hệ thống quản lý bán hàng cho nhà hàng với đầy đủ chức năn
 - Quản lý tài khoản người dùng và phân quyền (Admin / Staff / Customer)
 - Quản lý thực đơn (danh mục, món ăn)
 - Quản lý bàn ăn và trạng thái bàn
+- **Đặt bàn trước** — khách giữ chỗ, Staff/Admin xếp bàn, đón khách tự sinh đơn hàng, đặt bàn tự hoàn tất khi khách trả tiền
 - Quản lý đơn hàng theo quy trình thực tế
 - Xử lý thanh toán (tiền mặt, chuyển khoản)
+- Mã giảm giá (voucher) cho đơn hàng
 - Dashboard thống kê và báo cáo doanh thu
 - Giao diện web responsive cho cả desktop và mobile
 
@@ -145,9 +147,11 @@ orders ──── order_items
 | `categories` | Danh mục món ăn |
 | `products` | Món ăn / Thực đơn |
 | `restaurant_tables` | Bàn ăn |
+| `reservations` | Đặt bàn trước (ngày, giờ, số khách, bàn xếp, trạng thái, `order_id` liên kết đơn hàng) |
 | `orders` | Đơn hàng |
 | `order_items` | Chi tiết từng món trong đơn |
 | `payments` | Thông tin thanh toán |
+| `vouchers` | Mã giảm giá |
 
 ---
 
@@ -295,6 +299,17 @@ http://localhost:8080/api
 | POST | `/orders` | Authenticated |
 | PATCH | `/orders/{id}/status` | ADMIN/STAFF |
 
+### Reservations (Đặt bàn)
+| Method | Endpoint | Auth | Mô tả |
+|---|---|---|---|
+| POST | `/reservations` | Authenticated | Khách đặt bàn (ngày/giờ/số người) |
+| GET | `/reservations/my` | Authenticated | Xem đặt bàn của mình |
+| GET | `/reservations` | ADMIN/STAFF | Danh sách tất cả (lọc theo status/date) |
+| GET | `/reservations/{id}` | Authenticated | Chi tiết (customer chỉ xem của mình) |
+| PATCH | `/reservations/{id}/status` | ADMIN/STAFF | Xác nhận + gán bàn / Hủy / Khách không đến |
+| POST | `/reservations/{id}/check-in` | ADMIN/STAFF | Đón khách: chiếm bàn + tự tạo đơn hàng trống |
+| DELETE | `/reservations/{id}` | Authenticated | Customer hủy đặt bàn của mình |
+
 ### Payments & Dashboard
 | Method | Endpoint | Auth |
 |---|---|---|
@@ -325,6 +340,45 @@ http://localhost:8080/api
    → Order: CONFIRMED → COMPLETED
    → Bàn: OCCUPIED → AVAILABLE
 ```
+
+### Quy trình đặt bàn trước (mô phỏng đúng nghiệp vụ nhà hàng)
+
+```
+1. Khách đặt bàn (POST /api/reservations) — chỉ chọn ngày/giờ/số người, KHÔNG chọn bàn
+   → Trạng thái: PENDING
+        ↓
+2. Admin/Staff xem danh sách đặt bàn → "Xác nhận + Gán bàn"
+   (PATCH /api/reservations/{id}/status → CONFIRMED, kèm tableId)
+   → Kiểm tra: bàn đủ sức chứa, không trùng lịch bàn khác trong ±2 giờ
+        ↓
+3. Khách đến → Staff bấm "Đón khách" (POST /api/reservations/{id}/check-in)
+   → Reservation: CONFIRMED → CHECKED_IN
+   → Bàn:           AVAILABLE → OCCUPIED
+   → Tự tạo đơn hàng trống (PENDING) gắn với đặt bàn (reservations.order_id)
+        ↓
+4. Staff mở đơn hàng của bàn → "Thêm món" → xác nhận đơn → thanh toán
+        ↓
+5. Khách trả tiền (PATCH /api/payments/{id}/confirm)
+   → Order:  CONFIRMED → COMPLETED
+   → Reservation tự động: CHECKED_IN → COMPLETED
+   → Bàn:    OCCUPIED → AVAILABLE
+```
+
+Nhánh khác:
+
+| Tình huống | Trạng thái | Cách xử lý |
+|---|---|---|
+| Khách báo hủy trước khi đến | `CANCELLED` | Khách tự hủy (DELETE), Staff/Admin hủy hộ |
+| Đến giờ mà khách không đến | `NO_SHOW` | Staff bấm "Khách không đến" |
+| Staff vô tình đổi sang CHECKED_IN / COMPLETED | bị từ chối | Backend trả về thông báo phải dùng "Đón khách" / sẽ tự hoàn tất khi thanh toán |
+| Đơn của khách bị hủy/xóa sau khi đón | `CONFIRMED` | Đặt bàn quay lại trạng thái đã xác nhận, bỏ liên kết đơn cũ để đón lại |
+| Khách chuyển sang bàn khác | `CHECKED_IN` | "Chuyển bàn" trên đơn hàng sẽ cập nhật bàn theo |
+
+Ràng buộc nghiệp vụ:
+- Một đặt bàn chỉ tạo tối đa một đơn hàng (quan hệ 1-1 qua `reservations.order_id`, `ON DELETE SET NULL`).
+- Không đón khách vào bàn đang có đơn hàng chưa hoàn thành.
+- Bàn chỉ bị "giữ" (OCCUPIED) khi khách thực đến; CONFIRMED chỉ là xếp bàn trước trên giấy tờ.
+- Customer chỉ xem/hủy được đặt bàn của mình và không tự hủy sau khi đã vào bàn.
 
 ---
 
@@ -361,8 +415,9 @@ QLBH/
 │   └── vite.config.js
 │
 ├── database/
-│   ├── schema.sql              # DDL - Tạo bảng
-│   └── seed_data.sql           # DML - Dữ liệu mẫu
+│   ├── schema.sql              # DDL - Tạo bảng (gồm reservations + order_id)
+│   ├── seed_data.sql           # DML - Dữ liệu mẫu
+│   └── add_reservations.sql    # Nâng cấp DB cũ: bảng reservations + order_id + CHECKED_IN/NO_SHOW
 │
 └── README.md
 ```

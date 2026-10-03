@@ -6,7 +6,7 @@ import { toast } from 'react-toastify'
  *
  * - baseURL: vite.config.js proxy /api → http://localhost:8080/api
  * - Request interceptor: tự động thêm JWT token vào header
- * - Response interceptor: xử lý lỗi tập trung (401, 403, 500)
+ * - Response interceptor: xử lý lỗi tập trung
  */
 const api = axios.create({
   baseURL: '/api',
@@ -15,7 +15,6 @@ const api = axios.create({
 })
 
 // ── REQUEST INTERCEPTOR ─────────────────────────────────
-// Tự động gắn "Authorization: Bearer <token>" vào mỗi request
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
@@ -28,27 +27,41 @@ api.interceptors.request.use(
 )
 
 // ── RESPONSE INTERCEPTOR ────────────────────────────────
-// Xử lý lỗi tập trung, không cần try/catch ở từng service
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status  = error.response?.status
     const message = error.response?.data?.message || 'Đã xảy ra lỗi'
 
+    // Bỏ qua lỗi 401 từ /auth/me (init check khi khởi động app)
+    const isAuthMeCall = error.config?.url?.includes('/auth/me')
+
     if (status === 401) {
-      // Token hết hạn hoặc không hợp lệ → đăng xuất
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
-      toast.error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.')
+      if (!isAuthMeCall) {
+        // Token hết hạn khi đang dùng app → xóa và redirect
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        // Chỉ redirect nếu đang ở trang cần auth, không phải trang public
+        const publicPaths = ['/', '/menu', '/login', '/register']
+        const isPublic = publicPaths.some(p => window.location.pathname === p || window.location.pathname.startsWith('/menu'))
+        if (!isPublic) {
+          toast.error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.')
+          setTimeout(() => { window.location.href = '/login' }, 1500)
+        }
+      }
     } else if (status === 403) {
       toast.error('Bạn không có quyền thực hiện thao tác này')
     } else if (status === 404) {
-      // Không toast 404 ở đây — để component xử lý
+      // Không toast — để component tự xử lý
     } else if (status === 409) {
       toast.error(message)
+    } else if (status === 400) {
+      // Không toast tự động — để component xử lý validation
     } else if (status >= 500) {
-      toast.error('Lỗi máy chủ. Vui lòng thử lại sau.')
+      // Chỉ toast nếu không phải request init
+      if (!isAuthMeCall) {
+        toast.error('Lỗi máy chủ. Vui lòng thử lại sau.')
+      }
     }
 
     return Promise.reject(error)

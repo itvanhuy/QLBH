@@ -12,6 +12,7 @@ import com.restaurant.repository.OrderRepository;
 import com.restaurant.repository.PaymentRepository;
 import com.restaurant.repository.TableRepository;
 import com.restaurant.service.PaymentService;
+import com.restaurant.service.ReservationService;
 import com.restaurant.util.AppConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
     private final TableRepository tableRepository;
+    private final ReservationService reservationService;
 
     // ====================================================
     // TẠO THANH TOÁN (Bước 1)
@@ -114,6 +116,9 @@ public class PaymentServiceImpl implements PaymentService {
         RestaurantTable table = order.getTable();
         table.setStatus(RestaurantTable.Status.AVAILABLE);
         tableRepository.save(table);
+
+        // 4. Đặt bàn liên kết (nếu đơn đến từ đặt bàn trước) tự hoàn tất
+        reservationService.handleOrderCompleted(order.getId());
 
         log.info("Xác nhận thanh toán id={}, order id={}, bàn {} → AVAILABLE",
                 id, order.getId(), table.getTableNumber());

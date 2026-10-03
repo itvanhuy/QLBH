@@ -6,6 +6,9 @@ import com.restaurant.dto.response.ApiResponse;
 import com.restaurant.dto.response.OrderResponse;
 import com.restaurant.dto.response.PageResponse;
 import com.restaurant.entity.Order;
+import com.restaurant.entity.User;
+import com.restaurant.exception.UnauthorizedException;
+import com.restaurant.repository.UserRepository;
 import com.restaurant.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,6 +37,7 @@ import java.util.Map;
 public class OrderController {
 
     private final OrderService orderService;
+    private final UserRepository userRepository;
 
     // ── Admin/Staff: xem tất cả orders ─────────────────────
     @GetMapping
@@ -62,9 +67,27 @@ public class OrderController {
     // ── Xem chi tiết 1 order ────────────────────────────────
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<OrderResponse>> getOrderById(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin đơn hàng thành công",
-                orderService.getOrderById(id)));
+    public ResponseEntity<ApiResponse<OrderResponse>> getOrderById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        OrderResponse response = orderService.getOrderById(id);
+
+        // Customer chỉ được xem đơn hàng của mình
+        boolean isCustomer = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals(new SimpleGrantedAuthority("ROLE_CUSTOMER").getAuthority()));
+
+        if (isCustomer) {
+            User currentUser = userRepository.findByEmail(userDetails.getUsername())
+                    .orElseThrow(() -> new UnauthorizedException("Vui lòng đăng nhập lại"));
+            // Nếu order không có customer hoặc customer không khớp → 403
+            Long orderCustomerId = response.getCustomerId();
+            if (orderCustomerId == null || !orderCustomerId.equals(currentUser.getId())) {
+                throw new UnauthorizedException("Bạn không có quyền xem đơn hàng này");
+            }
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin đơn hàng thành công", response));
     }
 
         @GetMapping("/table/{tableId}/active")
@@ -95,6 +118,17 @@ public class OrderController {
 
         return ResponseEntity.ok(ApiResponse.success("Cập nhật đơn hàng thành công",
                 orderService.updateOrder(id, request)));
+    }
+
+    // ── Thêm món vào đơn đang active (PENDING/CONFIRMED) ────
+    @PostMapping("/{id}/items")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    public ResponseEntity<ApiResponse<OrderResponse>> addItemsToOrder(
+            @PathVariable Long id,
+            @Valid @RequestBody java.util.List<com.restaurant.dto.request.OrderItemRequest> items) {
+
+        return ResponseEntity.ok(ApiResponse.success("Thêm món thành công",
+                orderService.addItemsToOrder(id, items)));
     }
 
     // ── Cập nhật trạng thái order ───────────────────────────

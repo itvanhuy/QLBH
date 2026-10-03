@@ -9,6 +9,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 /**
@@ -32,11 +33,16 @@ public class JwtTokenProvider {
 
     /**
      * Tạo SecretKey từ chuỗi secret trong config.
-     * HMAC-SHA256 yêu cầu key >= 256 bit.
+     * HMAC-SHA256 yêu cầu key >= 256 bit (= 32 bytes).
      */
     private SecretKey getSigningKey() {
-        // Encode secret thành bytes rồi tạo key
-        byte[] keyBytes = jwtSecret.getBytes();
+        // Encode secret theo UTF-8 rồi tạo key
+        byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+        // Đảm bảo key đủ dài cho HMAC-SHA256 (>= 32 bytes)
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException(
+                    "JWT secret quá ngắn (" + keyBytes.length + " bytes). Cần tối thiểu 32 ký tự cho HMAC-SHA256.");
+        }
         return Keys.hmacShaKeyFor(keyBytes);
     }
 

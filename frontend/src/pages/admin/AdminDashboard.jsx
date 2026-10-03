@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { ShoppingBag, Users, ClipboardList, Table2, TrendingUp, DollarSign } from 'lucide-react'
+import { ShoppingBag, Users, ClipboardList, Table2, TrendingUp, DollarSign, CalendarDays, ArrowRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
 import dashboardService from '../../services/dashboardService'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
@@ -79,6 +80,26 @@ export default function AdminDashboard() {
             <span className={`text-xl font-bold px-3 py-1 rounded-lg ${t.color}`}>{t.val}</span>
           </div>
         ))}
+      </div>
+
+      {/* Reservations row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { label: 'Đặt bàn chờ xác nhận', val: s.pendingReservations, color: 'text-yellow-600 bg-yellow-50' },
+          { label: 'Tổng đặt bàn',         val: s.totalReservations,   color: 'text-primary-600 bg-primary-50' },
+        ].map(t => (
+          <div key={t.label} className={`card-sm flex items-center justify-between`}>
+            <div className="flex items-center gap-3">
+              <CalendarDays className="h-5 w-5 text-gray-400" />
+              <span className="text-sm text-gray-600">{t.label}</span>
+            </div>
+            <span className={`text-xl font-bold px-3 py-1 rounded-lg ${t.color}`}>{t.val}</span>
+          </div>
+        ))}
+        <Link to="/admin/reservations" className="card-sm flex items-center justify-between hover:border-primary-300 transition-colors">
+          <span className="text-sm font-medium text-primary-600">Quản lý đặt bàn</span>
+          <ArrowRight className="h-4 w-4 text-primary-400" />
+        </Link>
       </div>
 
       {/* Charts */}

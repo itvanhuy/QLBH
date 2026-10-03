@@ -9,6 +9,7 @@ import com.restaurant.exception.BadRequestException;
 import com.restaurant.exception.ResourceNotFoundException;
 import com.restaurant.repository.*;
 import com.restaurant.service.OrderService;
+import com.restaurant.service.ReservationService;
 import com.restaurant.util.AppConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +49,7 @@ public class OrderServiceImpl implements OrderService {
     private final TableRepository tableRepository;
     private final ProductRepository productRepository;
     private final VoucherRepository voucherRepository;
+    private final ReservationService reservationService;
 
     // ====================================================
     // GET ALL (Admin/Staff)
@@ -132,12 +134,18 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // 5. Tạo Order entity
+        // Khách hàng tự đặt online → chuyển thẳng sang CONFIRMED (đang xử lý/phục vụ)
+        // Staff/Admin tạo hộ khách → PENDING (chờ bếp/nhân viên xác nhận)
+        Order.Status initialStatus = (currentUser.getRole() == User.Role.ROLE_CUSTOMER)
+                ? Order.Status.CONFIRMED
+                : Order.Status.PENDING;
+
         Order order = Order.builder()
                 .table(table)
                 .customer(customer)
                 .staff(staff)
                 .note(request.getNote())
-                .status(Order.Status.PENDING)
+                .status(initialStatus)
                 .items(new ArrayList<>())
                 .build();
 
@@ -148,9 +156,10 @@ public class OrderServiceImpl implements OrderService {
         // 7. Tính tiền trước khi giảm
         order.recalculateTotalAmount();
 
-        // 8. Áp dụng voucher nếu có
+        // 8. Áp dụng voucher nếu có (tính toán + tăng lượt dùng 1 lần duy nhất)
         if (request.getVoucherCode() != null && !request.getVoucherCode().isBlank()) {
-            applyVoucher(order, request.getVoucherCode());
+            calculateAndApplyVoucherDiscount(order, request.getVoucherCode());
+            consumeVoucherUsage(request.getVoucherCode());
         }
 
         // 9. Lưu order
@@ -206,6 +215,12 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(newStatus);
 
+        // Khi order hủy → hoàn lại 1 lượt voucher đã dùng (nếu có)
+        if (newStatus == Order.Status.CANCELLED && order.getVoucherCode() != null) {
+            refundVoucherUsage(order.getVoucherCode());
+            log.info("Hoàn lại lượt dùng voucher {} (order id={} CANCELLED)", order.getVoucherCode(), id);
+        }
+
         // Khi order hoàn thành hoặc hủy → bàn trở về AVAILABLE
         if (newStatus == Order.Status.COMPLETED || newStatus == Order.Status.CANCELLED) {
             RestaurantTable table = order.getTable();
@@ -213,6 +228,13 @@ public class OrderServiceImpl implements OrderService {
             tableRepository.save(table);
             log.info("Bàn {} trở về AVAILABLE (order {} -> {})",
                     table.getTableNumber(), id, newStatus);
+        }
+
+        // Đồng bộ đặt bàn liên kết (nếu đơn đến từ đặt bàn trước)
+        if (newStatus == Order.Status.COMPLETED) {
+            reservationService.handleOrderCompleted(id);
+        } else if (newStatus == Order.Status.CANCELLED) {
+            reservationService.handleOrderDiscarded(id);
         }
 
         return OrderResponse.fromEntity(orderRepository.save(order));
@@ -256,6 +278,9 @@ public class OrderServiceImpl implements OrderService {
 
         log.info("Chuyển order id={} từ bàn {} sang bàn {}", saved.getId(), sourceTable.getTableNumber(), targetTable.getTableNumber());
 
+        // Cập nhật lại bàn trên đặt bàn liên kết (nếu đơn đến từ đặt bàn trước)
+        reservationService.handleOrderTransferred(saved.getId(), targetTable.getId());
+
         return OrderResponse.fromEntity(saved);
     }
 
@@ -266,12 +291,21 @@ public class OrderServiceImpl implements OrderService {
     public void deleteOrder(Long id) {
         Order order = findById(id);
 
+        // Nếu order chưa hoàn tất mà đã dùng voucher → hoàn lại 1 lượt voucher (tránh hao lượt ảo khi xóa
+        if (order.getStatus() != Order.Status.COMPLETED && order.getVoucherCode() != null) {
+            refundVoucherUsage(order.getVoucherCode());
+            log.info("Hoàn lại lượt dùng voucher {} khi xóa order id={}", order.getVoucherCode(), id);
+        }
+
         // Nếu order đang active → trả bàn về AVAILABLE
         if (order.getStatus() == Order.Status.PENDING
                 || order.getStatus() == Order.Status.CONFIRMED) {
             order.getTable().setStatus(RestaurantTable.Status.AVAILABLE);
             tableRepository.save(order.getTable());
         }
+
+        // Đặt bàn liên kết (nếu có) quay lại CONFIRMED
+        reservationService.handleOrderDiscarded(id);
 
         orderRepository.delete(order);
         log.info("Đã xóa order id={}", id);
@@ -282,11 +316,10 @@ public class OrderServiceImpl implements OrderService {
     // ====================================================
 
     /**
-     * Tạo danh sách OrderItem từ request.
-     * Kiểm tra từng sản phẩm tồn tại và đang AVAILABLE.
-     * Snapshot giá tại thời điểm đặt.
+     * Validate voucher, tính toán và áp dụng discountAmount vào order.
+     * KHÔNG tăng usedCount (chỉ tính giá).
      */
-    private void applyVoucher(Order order, String code) {
+    private void calculateAndApplyVoucherDiscount(Order order, String code) {
         Voucher voucher = voucherRepository.findByCodeIgnoreCaseAndIsActiveTrue(code.trim())
                 .orElseThrow(() -> new BadRequestException("Mã giảm giá không tồn tại hoặc đã bị vô hiệu hóa"));
 
@@ -298,7 +331,8 @@ public class OrderServiceImpl implements OrderService {
             throw new BadRequestException("Mã giảm giá đã hết hạn");
         }
 
-        if (voucher.getUsageLimit() > 0 && voucher.getUsedCount() >= voucher.getUsageLimit()) {
+        if (voucher.getUsageLimit() != null && voucher.getUsageLimit() > 0
+                && voucher.getUsedCount() != null && voucher.getUsedCount() >= voucher.getUsageLimit()) {
             throw new BadRequestException("Mã giảm giá đã hết lượt sử dụng");
         }
 
@@ -323,10 +357,43 @@ public class OrderServiceImpl implements OrderService {
 
         order.setVoucherCode(voucher.getCode());
         order.setDiscountAmount(discount);
-        order.setTotalAmount(order.getTotalAmount().subtract(discount));
+        // Recalc sẽ trừ discount tự động
+        order.recalculateTotalAmount();
+    }
 
-        voucher.setUsedCount((voucher.getUsedCount() == null ? 0 : voucher.getUsedCount()) + 1);
-        voucherRepository.save(voucher);
+    /**
+     * Tăng usedCount của voucher (gọi 1 lần duy nhất khi order thực sự được tạo).
+     */
+    private void consumeVoucherUsage(String code) {
+        voucherRepository.findByCodeIgnoreCaseAndIsActiveTrue(code.trim()).ifPresent(voucher -> {
+            int current = voucher.getUsedCount() == null ? 0 : voucher.getUsedCount();
+            voucher.setUsedCount(current + 1);
+            voucherRepository.save(voucher);
+        });
+    }
+
+    /**
+     * Hoàn lại 1 lượt dùng voucher khi order bị hủy/xóa.
+     * Luôn đảm bảo usedCount >= 0.
+     */
+    private void refundVoucherUsage(String code) {
+        if (code == null) return;
+        voucherRepository.findByCodeIgnoreCase(code.trim()).ifPresent(voucher -> {
+            int current = voucher.getUsedCount() == null ? 0 : voucher.getUsedCount();
+            voucher.setUsedCount(Math.max(0, current - 1));
+            voucherRepository.save(voucher);
+        });
+    }
+
+    /**
+     * Deprecated: dùng calculateAndApplyVoucherDiscount + consumeVoucherUsage riêng biệt
+     * để tránh tăng usedCount gấp đôi khi gọi applyVoucher nhiều lần.
+     * @deprecated sử dụng calculateAndApplyVoucherDiscount + consumeVoucherUsage
+     */
+    @Deprecated(since = "1.0")
+    private void applyVoucher(Order order, String code) {
+        calculateAndApplyVoucherDiscount(order, code);
+        consumeVoucherUsage(code);
     }
 
     private List<OrderItem> buildOrderItems(List<OrderItemRequest> itemRequests, Order order) {
@@ -354,6 +421,61 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return items;
+    }
+
+    // ====================================================
+    // ADD ITEMS TO EXISTING ORDER (PENDING hoặc CONFIRMED)
+    // ====================================================
+    @Override
+    public OrderResponse addItemsToOrder(Long id, List<OrderItemRequest> newItems) {
+        Order order = findById(id);
+
+        if (order.getStatus() == Order.Status.COMPLETED
+                || order.getStatus() == Order.Status.CANCELLED) {
+            throw new BadRequestException("Không thể thêm món cho đơn hàng đã hoàn tất hoặc hủy");
+        }
+
+        // Với mỗi item mới: nếu product đã có trong giỏ thì cộng số lượng,
+        // nếu chưa thì thêm mới
+        for (OrderItemRequest req : newItems) {
+            Product product = productRepository.findById(req.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Món ăn ID " + req.getProductId() + " không tồn tại"));
+
+            if (product.getStatus() != Product.Status.AVAILABLE) {
+                throw new BadRequestException("Món '" + product.getName() + "' hiện không còn phục vụ");
+            }
+
+            // Tìm item đã có trong order chưa
+            OrderItem existing = order.getItems().stream()
+                    .filter(i -> i.getProduct().getId().equals(product.getId()))
+                    .findFirst().orElse(null);
+
+            if (existing != null) {
+                // Cộng thêm số lượng
+                existing.setQuantity(existing.getQuantity() + req.getQuantity());
+                existing.calculateSubtotal();
+            } else {
+                // Thêm item mới
+                OrderItem item = OrderItem.builder()
+                        .order(order)
+                        .product(product)
+                        .quantity(req.getQuantity())
+                        .price(product.getPrice())
+                        .build();
+                item.calculateSubtotal();
+                order.getItems().add(item);
+            }
+        }
+
+        order.recalculateTotalAmount();
+
+        // Tính lại discount nếu có voucher (CHỈ tính, KHÔNG tăng usedCount nữa)
+        if (order.getVoucherCode() != null) {
+            calculateAndApplyVoucherDiscount(order, order.getVoucherCode());
+        }
+
+        return OrderResponse.fromEntity(orderRepository.save(order));
     }
 
     /**

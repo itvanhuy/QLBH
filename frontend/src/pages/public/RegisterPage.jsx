@@ -78,7 +78,7 @@ export default function RegisterPage() {
               <input type="tel" placeholder="0901234567"
                 className="form-input"
                 {...register('phone', {
-                  pattern: { value: /^(\\+84|0)[0-9]{9,10}$/, message: 'Số điện thoại không hợp lệ' },
+                  pattern: { value: /^(\+84|0)[0-9]{9,10}$/, message: 'Số điện thoại không hợp lệ' },
                 })}
               />
               {errors.phone && <p className="form-error">{errors.phone.message}</p>}

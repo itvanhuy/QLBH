@@ -4,6 +4,7 @@ import com.restaurant.dto.response.DashboardResponse;
 import com.restaurant.dto.response.OrderResponse;
 import com.restaurant.entity.Order;
 import com.restaurant.entity.Product;
+import com.restaurant.entity.Reservation;
 import com.restaurant.entity.RestaurantTable;
 import com.restaurant.entity.User;
 import com.restaurant.repository.*;
@@ -32,6 +33,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final ProductRepository productRepository;
     private final TableRepository tableRepository;
     private final OrderItemRepository orderItemRepository;
+    private final ReservationRepository reservationRepository;
 
     // ====================================================
     // STATISTICS - Thống kê tổng quan
@@ -61,6 +63,10 @@ public class DashboardServiceImpl implements DashboardService {
         long availableTables = tableRepository.countByStatus(RestaurantTable.Status.AVAILABLE);
         long occupiedTables  = tableRepository.countByStatus(RestaurantTable.Status.OCCUPIED);
 
+        // Đếm đặt bàn
+        long totalReservations   = reservationRepository.count();
+        long pendingReservations = reservationRepository.countByStatus(Reservation.Status.PENDING);
+
         // 10 orders gần nhất
         List<OrderResponse> recentOrders = orderRepository
                 .findTop10ByOrderByCreatedAtDesc()
@@ -85,6 +91,8 @@ public class DashboardServiceImpl implements DashboardService {
                 .totalTables(totalTables)
                 .availableTables(availableTables)
                 .occupiedTables(occupiedTables)
+                .totalReservations(totalReservations)
+                .pendingReservations(pendingReservations)
                 .recentOrders(recentOrders)
                 .topProducts(topProducts)
                 .build();

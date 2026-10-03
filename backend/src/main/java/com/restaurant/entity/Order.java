@@ -94,13 +94,18 @@ public class Order {
     private Payment payment;
 
     // ====================================================
-    // Helper method: tính lại tổng tiền từ các items
+    // Helper method: tính lại tổng tiền từ các items (trừ giảm giá nếu có)
     // Gọi method này mỗi khi thêm/xóa/sửa items
     // ====================================================
     public void recalculateTotalAmount() {
-        this.totalAmount = items.stream()
+        BigDecimal subtotal = items.stream()
                 .map(OrderItem::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal discount = (this.discountAmount != null) ? this.discountAmount : BigDecimal.ZERO;
+        this.totalAmount = subtotal.subtract(discount);
+        if (this.totalAmount.compareTo(BigDecimal.ZERO) < 0) {
+            this.totalAmount = BigDecimal.ZERO;
+        }
     }
 
     // Enum trạng thái đơn hàng - theo flow bán hàng

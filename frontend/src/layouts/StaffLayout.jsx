@@ -2,15 +2,16 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import {
   UtensilsCrossed, LayoutDashboard, Table2,
-  ClipboardList, CreditCard, LogOut, Menu, X
+  ClipboardList, CreditCard, CalendarDays, LogOut, Menu, X
 } from 'lucide-react'
 import { useState } from 'react'
 
 const navItems = [
-  { to: '/staff/dashboard', icon: LayoutDashboard, label: 'Dashboard'  },
-  { to: '/staff/tables',    icon: Table2,          label: 'Bàn ăn'     },
-  { to: '/staff/orders',    icon: ClipboardList,   label: 'Đơn hàng'   },
-  { to: '/staff/payments',  icon: CreditCard,      label: 'Thanh toán' },
+  { to: '/staff/dashboard',    icon: LayoutDashboard, label: 'Dashboard'  },
+  { to: '/staff/tables',       icon: Table2,          label: 'Bàn ăn'     },
+  { to: '/staff/orders',       icon: ClipboardList,   label: 'Đơn hàng'   },
+  { to: '/staff/reservations', icon: CalendarDays,    label: 'Đặt bàn'    },
+  { to: '/staff/payments',     icon: CreditCard,      label: 'Thanh toán' },
 ]
 
 export default function StaffLayout() {

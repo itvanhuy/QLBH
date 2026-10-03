@@ -3,7 +3,6 @@ package com.restaurant.config;
 import com.restaurant.security.CustomUserDetailsService;
 import com.restaurant.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -94,14 +93,17 @@ public class SecurityConfig {
                 // ── PUBLIC: ai cũng truy cập được ──────────────────────────
                 .requestMatchers("/api/auth/**").permitAll()
 
-                // Menu công khai - GET only
-                .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/tables/**").permitAll()
+                // ── PUBLIC: Menu + Auth ────────────────────────────────
+                .requestMatchers(HttpMethod.GET,  "/api/products/**").permitAll()
+                .requestMatchers(HttpMethod.GET,  "/api/categories/**").permitAll()
+                .requestMatchers(HttpMethod.GET,  "/api/tables/**").permitAll()
+                // Validate voucher: authenticated users gọi (customer, staff, admin)
+                .requestMatchers(HttpMethod.POST, "/api/vouchers/validate").authenticated()
 
                 // ── ADMIN only ─────────────────────────────────────────────
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/dashboard/**").hasRole("ADMIN")
+                .requestMatchers("/api/vouchers/**").hasAnyRole("ADMIN", "STAFF")
 
                 // DELETE thường chỉ ADMIN
                 .requestMatchers(HttpMethod.DELETE, "/api/users/**").hasRole("ADMIN")

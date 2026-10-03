@@ -28,6 +28,8 @@ public class DashboardResponse {
     private long totalTables;            // Tổng bàn
     private long availableTables;        // Bàn đang trống
     private long occupiedTables;         // Bàn đang có khách
+    private long totalReservations;      // Tổng đặt bàn
+    private long pendingReservations;    // Đặt bàn chờ xác nhận
 
     // ── Orders gần nhất ──────────────────────────────────
     private List<OrderResponse> recentOrders;

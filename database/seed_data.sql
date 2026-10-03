@@ -73,8 +73,8 @@ INSERT INTO restaurant_tables (table_number, capacity, status) VALUES
 ('02', 2,  'AVAILABLE'),
 ('03', 4,  'AVAILABLE'),
 ('04', 4,  'AVAILABLE'),
-('05', 4,  'OCCUPIED'),   -- Đang có khách để demo
-('06', 6,  'AVAILABLE'),
+('05', 4,  'OCCUPIED'),   -- Đang có khách để demo (đơn #1)
+('06', 6,  'OCCUPIED'),   -- Đang có khách để demo (đơn #5 PENDING)
 ('07', 6,  'AVAILABLE'),
 ('08', 8,  'RESERVED'),   -- Đã đặt trước để demo
 ('09', 8,  'AVAILABLE'),
@@ -140,6 +140,15 @@ INSERT INTO payments (order_id, amount, method, status, paid_at) VALUES
 (4, 120000, 'CASH',    'FAILED', NULL);  -- Order bị hủy, payment failed
 
 -- ============================================================
+-- 8. RESERVATIONS - Đặt bàn trước mẫu
+-- ============================================================
+INSERT INTO reservations (customer_id, table_id, guest_count, reservation_date, reservation_time, note, status) VALUES
+(4, 6,    4, '2026-10-05', '18:00:00', 'Sinh nhật, cần bánh và nến', 'CONFIRMED'),
+(5, 7,    2, '2026-10-06', '12:00:00', NULL,                         'PENDING'),
+(6, NULL, 6, '2026-10-07', '19:30:00', 'Họp mặt gia đình',           'PENDING'),
+(5, NULL, 2, '2026-09-28', '19:00:00', NULL,                         'NO_SHOW');
+
+-- ============================================================
 -- VERIFY - Kiểm tra dữ liệu
 -- ============================================================
 SELECT 'users'              AS `table`, COUNT(*) AS `count` FROM users
@@ -154,4 +163,6 @@ SELECT 'orders',             COUNT(*) FROM orders
 UNION ALL
 SELECT 'order_items',        COUNT(*) FROM order_items
 UNION ALL
-SELECT 'payments',           COUNT(*) FROM payments;
+SELECT 'payments',           COUNT(*) FROM payments
+UNION ALL
+SELECT 'reservations',       COUNT(*) FROM reservations;

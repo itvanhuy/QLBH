@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ShoppingCart, Tag } from 'lucide-react'
 import productService from '../../services/productService'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { formatCurrency } from '../../utils/formatters'
+import { useAuth } from '../../hooks/useAuth'
 
 export default function MenuDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
+  const { isAuthenticated, isCustomer, isStaff } = useAuth()
   const [product, setProduct] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
@@ -63,10 +66,18 @@ export default function MenuDetailPage() {
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                 {product.status === 'AVAILABLE' ? 'Món đang được phục vụ' : 'Món tạm thời ngừng phục vụ'}
               </div>
-              <Link to="/login" className="btn-primary w-full btn-lg justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isAuthenticated) return navigate('/login')
+                  if (isCustomer) return navigate('/customer/order')
+                  if (isStaff)    return navigate('/staff/orders/new')
+                  navigate('/admin/orders')
+                }}
+                className="btn-primary w-full btn-lg justify-center gap-2">
                 <ShoppingCart className="h-4 w-4" />
                 Đặt ngay
-              </Link>
+              </button>
             </div>
           </div>
         </div>

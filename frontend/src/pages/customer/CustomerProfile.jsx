@@ -7,7 +7,7 @@ import userService from '../../services/userService'
 import { formatRole, formatDateTime } from '../../utils/formatters'
 
 export default function CustomerProfile() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const [editing,  setEditing]  = useState(false)
   const [showPwd,  setShowPwd]  = useState(false)
   const [loading,  setLoading]  = useState(false)
@@ -19,7 +19,15 @@ export default function CustomerProfile() {
   const onSubmit = async (data) => {
     setLoading(true)
     try {
-      await userService.update(user.id, { name: data.name, email: data.email, phone: data.phone, password: data.password || undefined })
+      const payload = { name: data.name, email: data.email, phone: data.phone, password: data.password || undefined }
+      const res = await userService.update(user.id, payload)
+      // Update user trong context (không cần gọi lại /auth/me nữa)
+      await refreshUser({
+        ...user,
+        name:  res.data.data.name  ?? data.name,
+        email: res.data.data.email ?? data.email,
+        phone: res.data.data.phone ?? data.phone,
+      })
       toast.success('Cập nhật thông tin thành công')
       setEditing(false)
     } catch(err) { toast.error(err.response?.data?.message || 'Cập nhật thất bại') }

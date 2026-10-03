@@ -106,7 +106,8 @@ public class VoucherServiceImpl implements VoucherService {
             throw new BadRequestException("Mã giảm giá đã hết hạn");
         }
 
-        if (voucher.getUsageLimit() > 0 && voucher.getUsedCount() >= voucher.getUsageLimit()) {
+        if (voucher.getUsageLimit() != null && voucher.getUsageLimit() > 0
+                && voucher.getUsedCount() != null && voucher.getUsedCount() >= voucher.getUsageLimit()) {
             throw new BadRequestException("Mã giảm giá đã hết lượt sử dụng");
         }
 
